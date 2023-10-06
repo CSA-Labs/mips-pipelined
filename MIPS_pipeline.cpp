@@ -191,6 +191,8 @@ void printState(stateStruct state, int cycle) {
 
         printstate << "ID.Instr:\t" << state.ID.Instr << endl;
         printstate << "ID.nop:\t" << state.ID.nop << endl;
+        printstate << "---------------------------------------------------------------------------------------------------------------\t"<< endl;
+
 
         printstate << "EX.Read_data1:\t" << state.EX.Read_data1 << endl;
         printstate << "EX.Read_data2:\t" << state.EX.Read_data2 << endl;
@@ -204,6 +206,8 @@ void printState(stateStruct state, int cycle) {
         printstate << "EX.alu_op:\t" << state.EX.alu_op << endl;
         printstate << "EX.wrt_enable:\t" << state.EX.wrt_enable << endl;
         printstate << "EX.nop:\t" << state.EX.nop << endl;
+        printstate << "---------------------------------------------------------------------------------------------------------------\t"<< endl;
+
 
         printstate << "MEM.ALUresult:\t" << state.MEM.ALUresult << endl;
         printstate << "MEM.Store_data:\t" << state.MEM.Store_data << endl;
@@ -214,6 +218,8 @@ void printState(stateStruct state, int cycle) {
         printstate << "MEM.wrt_mem:\t" << state.MEM.wrt_mem << endl;
         printstate << "MEM.wrt_enable:\t" << state.MEM.wrt_enable << endl;
         printstate << "MEM.nop:\t" << state.MEM.nop << endl;
+        printstate << "---------------------------------------------------------------------------------------------------------------\t"<< endl;
+
 
         printstate << "WB.Wrt_data:\t" << state.WB.Wrt_data << endl;
         printstate << "WB.Rs:\t" << state.WB.Rs << endl;
@@ -221,6 +227,10 @@ void printState(stateStruct state, int cycle) {
         printstate << "WB.Wrt_reg_addr:\t" << state.WB.Wrt_reg_addr << endl;
         printstate << "WB.wrt_enable:\t" << state.WB.wrt_enable << endl;
         printstate << "WB.nop:\t" << state.WB.nop << endl;
+        printstate << "---------------------------------------------------------------------------------------------------------------\t"<< endl;
+        printstate << "Written to RF\t" << endl;
+        printstate << "###################################################################################################################\t"<< endl;
+
     }
     else cout << "Unable to open file";
     printstate.close();
@@ -251,6 +261,8 @@ int main() {
     state.MEM.wrt_enable = false;
 
     state.WB.wrt_enable = false;
+
+    bool stalled = false;
 
     int cycle = 0;
 
@@ -296,20 +308,17 @@ int main() {
         }
 
         /* --------------------- EX stage --------------------- */
-        if (state.EX.nop == true) {
-            state.MEM.nop = state.EX.nop;
-        }
-        else if (!state.EX.nop) {
+        if (!state.EX.nop) {
 
             bitset<32> alu_result;
 
-            if (state.EX.alu_op && state.EX.is_I_type) {                                     // lw, sw
+            if (state.EX.alu_op && state.EX.is_I_type) {                                        // lw, sw
                 alu_result = state.EX.Read_data1.to_ulong() + state.EX.Imm.to_ulong();
             }
-            else if (state.EX.alu_op && !state.EX.is_I_type) {                               // addu
+            else if (state.EX.alu_op && !state.EX.is_I_type) {                                  // addu
                 alu_result = state.EX.Read_data1.to_ulong() + state.EX.Read_data2.to_ulong();
             }
-            else {                                                                            // subu
+            else {                                                                              // subu, bne
                 alu_result = state.EX.Read_data1.to_ulong() - state.EX.Read_data2.to_ulong();
             }
 
@@ -325,35 +334,69 @@ int main() {
 
             state.MEM.nop = state.EX.nop;
         }
+        else if (state.EX.nop == true) {
+            state.MEM.nop = state.EX.nop;
+        }
 
         /* --------------------- ID stage --------------------- */
-        if (state.IF.nop == true && state.ID.nop == true) {
-            state.EX.nop = state.ID.nop;
-        }
-        else if (!state.ID.nop) {
+        if (!state.ID.nop) {
 
             bitset<6> opcode = (state.ID.Instr >> 26).to_ulong();
             bitset<6> funct = (state.ID.Instr & bitset<32>(0x3F)).to_ulong();
+            
+            // forwarding for Register-register hazard
+            if (!state.EX.nop && !state.EX.is_I_type && opcode == bitset<6>(0x00)){
+                if (state.EX.Wrt_reg_addr == state.ID.Instr.to_ulong() >> 21) {   // Rs
+                    state.EX.Read_data1 = state.MEM.ALUresult;  // forward to EX stage
+                }
+                else if (state.EX.Wrt_reg_addr == state.ID.Instr.to_ulong() >> 16) { // Rt
+                    state.EX.Read_data2 = state.MEM.ALUresult;  // forward to EX stage
+                }
+            }
+            else { // read Rs/Rt from RF (not forwarding)
+                state.EX.Read_data1 = myRF.readRF(((state.ID.Instr >> 21) & bitset<32>(0x1F)).to_ulong());
+                state.EX.Read_data2 = myRF.readRF(((state.ID.Instr >> 16) & bitset<32>(0x1F)).to_ulong());
+            }
 
             // ID/EXE
             state.EX.Imm = (state.ID.Instr & bitset<32>(0xFFFF)).to_ulong();
             state.EX.Rs = ((state.ID.Instr >> 21) & bitset<32>(0x1F)).to_ulong();
             state.EX.Rt = ((state.ID.Instr >> 16) & bitset<32>(0x1F)).to_ulong();
-            state.EX.Read_data1 = myRF.readRF(state.EX.Rs);
-            state.EX.Read_data2 = myRF.readRF(state.EX.Rt);
-            if (opcode == bitset<6>(0x00)) { // addu, subu
+            if (opcode == bitset<6>(0x00)) {                                                                            // addu, subu (Rd)
                 state.EX.Wrt_reg_addr = ((state.ID.Instr >> 11) & bitset<32>(0x1F)).to_ulong();
             }
-            else {                                                                                         // lw
+            else {                                                                                                      // lw (Rt)
                 state.EX.Wrt_reg_addr = ((state.ID.Instr >> 16) & bitset<32>(0x1F)).to_ulong();
             }
-            state.EX.is_I_type = (opcode == bitset<6>(0x23) || opcode == bitset<6>(0x2B));                 // set if instruction is I-type
-            state.EX.rd_mem = (opcode == bitset<6>(0x23));                                                  // set if instruction is lw
-            state.EX.wrt_mem = (opcode == bitset<6>(0x2B));                                                   // set if instruction is sw
-            state.EX.alu_op = (funct == bitset<6>(0x21) || opcode == bitset<6>(0x23) || opcode == bitset<6>(0x2B)); // set if instruction is addu, lw, or sw
-            state.EX.wrt_enable = (opcode == bitset<6>(0x00) || opcode == bitset<6>(0x23)); // set if instruction is lw or R-type
+            state.EX.is_I_type = (opcode == bitset<6>(0x23) || opcode == bitset<6>(0x2B) || opcode == bitset<6>(0x05)); // set if instruction is I-type (lw, sw, bne)
+            state.EX.rd_mem = (opcode == bitset<6>(0x23));                                                              // set if instruction is lw
+            state.EX.wrt_mem = (opcode == bitset<6>(0x2B));                                                             // set if instruction is sw
+            state.EX.alu_op = (funct == bitset<6>(0x21) || opcode == bitset<6>(0x23) || opcode == bitset<6>(0x2B));     // set if instruction is addu, lw, or sw
+            state.EX.wrt_enable = (opcode == bitset<6>(0x00) || opcode == bitset<6>(0x23));                             // set if instruction is lw or R-type
 
-            state.EX.nop = state.ID.nop;
+
+            if (!state.MEM.nop && state.MEM.rd_mem && (state.MEM.Wrt_reg_addr == state.EX.Rs || state.MEM.Wrt_reg_addr == state.EX.Rt)) {
+                state.EX.nop = true;
+            }
+            else if (state.EX.nop && state.MEM.rd_mem && state.MEM.Wrt_reg_addr == state.EX.Rs) {
+                state.EX.nop = false;
+
+                // forwarding for Rs
+                state.EX.Read_data1 = myRF.readRF(state.MEM.Wrt_reg_addr);  // forward to EX stage
+            }
+            else if (state.EX.nop && state.MEM.rd_mem && state.MEM.Wrt_reg_addr == state.EX.Rt) {
+                state.EX.nop = false;
+
+                // forwarding for Rt
+                state.EX.Read_data2 = myRF.readRF(state.MEM.Wrt_reg_addr);  // forward to EX stage 
+            }
+            else {
+                state.EX.nop = state.ID.nop;
+            }
+            
+        }
+        else if (state.IF.nop == true && state.ID.nop == true) {
+            state.EX.nop = true;
         }
 
         /* --------------------- IF stage --------------------- */
@@ -363,20 +406,21 @@ int main() {
             state.ID.Instr = myInsMem.readInstr(state.IF.PC);
             state.ID.nop = false;
 
-            if (state.ID.Instr == bitset<32>(0xFFFFFFFF)) {               //if instruction is halt then set nop of all stages to true
+            if (state.ID.Instr == bitset<32>(0xFFFFFFFF)) {                          //if instruction is halt then set nop of all stages to true
                 state.IF.nop = true;
                 state.ID.nop = true;
             }
             else {
-                state.IF.PC = state.IF.PC.to_ulong() + 4; // Update the PC for the next instruction
+                state.IF.PC = state.IF.PC.to_ulong() + 4;
             }
         }
 
         printState(state, cycle);
+        myRF.outputRF(); // dump RF;
         cycle++;
     }
 
-    myRF.outputRF();
+    //myRF.outputRF();
     myDataMem.outputDataMem();
 
     return 0;
