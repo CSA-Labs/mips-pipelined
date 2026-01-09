@@ -7,6 +7,21 @@ using namespace std;
 
 #define MemSize 1000
 
+static string joinPath(const string &dir, const string &file) {
+    if (dir.empty() || dir == ".") {
+        return file;
+    }
+    if (dir.back() == '/') {
+        return dir + file;
+    }
+    return dir + "/" + file;
+}
+
+static void printUsage(const char *prog) {
+    cout << "Usage: " << prog << " [--imem <path>] [--dmem <path>] [--outdir <dir>]" << endl;
+    cout << "Defaults: imem=./imem.txt dmem=./dmem.txt outdir=." << endl;
+}
+
 struct IFStruct {
     bitset<32>  PC;
     bool        nop;
@@ -78,9 +93,9 @@ public:
         Registers[Reg_addr.to_ulong()] = Wrt_reg_data;
     }
 
-    void outputRF() {
+    void outputRF(const string &out_path) {
         ofstream rfout;
-        rfout.open("RFresult.txt", std::ios_base::app);
+        rfout.open(out_path, std::ios_base::app);
         if (rfout.is_open()) {
             rfout << "State of RF:\t" << endl;
             for (int j = 0; j < 32; j++) {
@@ -98,12 +113,12 @@ private:
 class INSMem {
 public:
     bitset<32> Instruction;
-    INSMem() {
+    explicit INSMem(const string &imem_path) {
         IMem.resize(MemSize);
         ifstream imem;
         string line;
         int i = 0;
-        imem.open("imem.txt");
+        imem.open(imem_path);
         if (imem.is_open()) {
             while (getline(imem, line)) {
                 IMem[i] = bitset<8>(line);
@@ -131,12 +146,12 @@ private:
 class DataMem {
 public:
     bitset<32> ReadData;
-    DataMem() {
+    explicit DataMem(const string &dmem_path) {
         DMem.resize(MemSize);
         ifstream dmem;
         string line;
         int i = 0;
-        dmem.open("dmem.txt");
+        dmem.open(dmem_path);
         if (dmem.is_open()) {
             while (getline(dmem, line)) {
                 DMem[i] = bitset<8>(line);
@@ -164,9 +179,9 @@ public:
         DMem[Address.to_ulong() + 3] = bitset<8>(WriteData.to_string().substr(24, 8));
     }
 
-    void outputDataMem() {
+    void outputDataMem(const string &out_path) {
         ofstream dmemout;
-        dmemout.open("dmemresult.txt");
+        dmemout.open(out_path);
         if (dmemout.is_open()) {
             for (int j = 0; j < 1000; j++) {
                 dmemout << DMem[j] << endl;
@@ -180,9 +195,9 @@ private:
     vector<bitset<8>> DMem;
 };
 
-void printState(stateStruct state, int cycle) {
+void printState(stateStruct state, int cycle, const string &out_path) {
     ofstream printstate;
-    printstate.open("stateresult.txt", std::ios_base::app);
+    printstate.open(out_path, std::ios_base::app);
     if (printstate.is_open()) {
         printstate << "State after executing cycle:\t" << cycle << endl;
 
@@ -229,10 +244,37 @@ void printState(stateStruct state, int cycle) {
     printstate.close();
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+    string imem_path = "imem.txt";
+    string dmem_path = "dmem.txt";
+    string outdir = ".";
+
+    for (int i = 1; i < argc; i++) {
+        string arg = argv[i];
+        if (arg == "--help") {
+            printUsage(argv[0]);
+            return 0;
+        }
+        if (arg == "--imem" && i + 1 < argc) {
+            imem_path = argv[++i];
+            continue;
+        }
+        if (arg == "--dmem" && i + 1 < argc) {
+            dmem_path = argv[++i];
+            continue;
+        }
+        if (arg == "--outdir" && i + 1 < argc) {
+            outdir = argv[++i];
+            continue;
+        }
+        cout << "Unknown or incomplete option: " << arg << endl;
+        printUsage(argv[0]);
+        return 1;
+    }
+
     RF myRF;
-    INSMem myInsMem;
-    DataMem myDataMem;
+    INSMem myInsMem(imem_path);
+    DataMem myDataMem(dmem_path);
     stateStruct state;    // Contains the state of the pipeline
 
     // Initialize the pipeline state
@@ -506,12 +548,12 @@ int main() {
             }
         }
 
-        printState(state, cycle);
+        printState(state, cycle, joinPath(outdir, "stateresult.txt"));
         cycle++;
     }
 
-    myRF.outputRF();
-    myDataMem.outputDataMem();
+    myRF.outputRF(joinPath(outdir, "RFresult.txt"));
+    myDataMem.outputDataMem(joinPath(outdir, "dmemresult.txt"));
 
     return 0;
 }
