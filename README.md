@@ -3,7 +3,7 @@
 Cycle-accurate 5-stage pipelined MIPS simulator with basic hazard handling. It reads instruction/data memories from text files, simulates the pipeline, and writes register/memory/state traces to output files.
 
 ## Build
-- `make mips` builds the simulator binary `MIPS_pipeline` using `g++-11`.
+- `make` or `make mips` builds the simulator binary `MIPS_pipeline` using `g++-11` if available, otherwise `g++`.
 
 ## Run (default behavior)
 - `./MIPS_pipeline`
@@ -20,7 +20,9 @@ Cycle-accurate 5-stage pipelined MIPS simulator with basic hazard handling. It r
 ## Tests
 - `make test` (builds and runs the full testcase suite)
 - Or run directly: `bash scripts/run_all.sh`
-- The script executes each testcase and diffs outputs against golden files in each testcase directory.
+- Outputs are written under `out/<case_name>/` and diffed against each testcase’s `expected_results`.
+- Lines with `\tX` in golden files are treated as “don’t care” and ignored during comparison.
+- State trace diffs are skipped by default; set `STRICT_STATE=1` to enforce `stateresult.txt` comparisons.
 
 ## Project Structure
 - `MIPS_pipeline.cpp`: simulator implementation.
