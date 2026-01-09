@@ -195,49 +195,77 @@ private:
     vector<bitset<8>> DMem;
 };
 
+static string boolOrX(bool value, bool valid) {
+    if (!valid) {
+        return "X";
+    }
+    return value ? "1" : "0";
+}
+
+static string ulongOrX(unsigned long value, bool valid) {
+    if (!valid) {
+        return "X";
+    }
+    return to_string(value);
+}
+
+template <size_t N>
+static string bitsetOrX(const bitset<N> &value, bool valid) {
+    if (!valid) {
+        return "X";
+    }
+    return value.to_string();
+}
+
 void printState(stateStruct state, int cycle, const string &out_path) {
     ofstream printstate;
     printstate.open(out_path, std::ios_base::app);
     if (printstate.is_open()) {
+        bool if_valid = !state.IF.nop;
+        bool id_valid = !state.ID.nop;
+        bool ex_valid = !state.EX.nop;
+        bool mem_valid = !state.MEM.nop;
+        bool wb_valid = !state.WB.nop;
+
         printstate << "State after executing cycle:\t" << cycle << endl;
 
-        printstate << "IF.PC:\t" << state.IF.PC.to_ulong() << endl;
+        printstate << "IF.PC:\t" << ulongOrX(state.IF.PC.to_ulong(), if_valid) << endl;
         printstate << "IF.nop:\t" << state.IF.nop << endl;
 
-        printstate << "ID.Instr:\t" << state.ID.Instr << endl;
+        printstate << "ID.Instr:\t" << bitsetOrX(state.ID.Instr, id_valid) << endl;
         printstate << "ID.nop:\t" << state.ID.nop << endl;
 
 
-        printstate << "EX.Read_data1:\t" << state.EX.Read_data1 << endl;
-        printstate << "EX.Read_data2:\t" << state.EX.Read_data2 << endl;
-        printstate << "EX.Imm:\t" << state.EX.Imm << endl;
-        printstate << "EX.Rs:\t" << state.EX.Rs << endl;
-        printstate << "EX.Rt:\t" << state.EX.Rt << endl;
-        printstate << "EX.Wrt_reg_addr:\t" << state.EX.Wrt_reg_addr << endl;
-        printstate << "EX.is_I_type:\t" << state.EX.is_I_type << endl;
-        printstate << "EX.rd_mem:\t" << state.EX.rd_mem << endl;
-        printstate << "EX.wrt_mem:\t" << state.EX.wrt_mem << endl;
-        printstate << "EX.alu_op:\t" << state.EX.alu_op << endl;
-        printstate << "EX.wrt_enable:\t" << state.EX.wrt_enable << endl;
+        printstate << "EX.Read_data1:\t" << bitsetOrX(state.EX.Read_data1, ex_valid) << endl;
+        printstate << "EX.Read_data2:\t" << bitsetOrX(state.EX.Read_data2, ex_valid) << endl;
+        printstate << "EX.Imm:\t" << bitsetOrX(state.EX.Imm, ex_valid) << endl;
+        printstate << "EX.Rs:\t" << bitsetOrX(state.EX.Rs, ex_valid) << endl;
+        printstate << "EX.Rt:\t" << bitsetOrX(state.EX.Rt, ex_valid) << endl;
+        printstate << "EX.Wrt_reg_addr:\t" << bitsetOrX(state.EX.Wrt_reg_addr, ex_valid) << endl;
+        printstate << "EX.is_I_type:\t" << boolOrX(state.EX.is_I_type, ex_valid) << endl;
+        printstate << "EX.rd_mem:\t" << boolOrX(state.EX.rd_mem, ex_valid) << endl;
+        printstate << "EX.wrt_mem:\t" << boolOrX(state.EX.wrt_mem, ex_valid) << endl;
+        printstate << "EX.alu_op:\t" << boolOrX(state.EX.alu_op, ex_valid) << endl;
+        printstate << "EX.wrt_enable:\t" << boolOrX(state.EX.wrt_enable, ex_valid) << endl;
         printstate << "EX.nop:\t" << state.EX.nop << endl;
 
 
-        printstate << "MEM.ALUresult:\t" << state.MEM.ALUresult << endl;
-        printstate << "MEM.Store_data:\t" << state.MEM.Store_data << endl;
-        printstate << "MEM.Rs:\t" << state.MEM.Rs << endl;
-        printstate << "MEM.Rt:\t" << state.MEM.Rt << endl;
-        printstate << "MEM.Wrt_reg_addr:\t" << state.MEM.Wrt_reg_addr << endl;
-        printstate << "MEM.rd_mem:\t" << state.MEM.rd_mem << endl;
-        printstate << "MEM.wrt_mem:\t" << state.MEM.wrt_mem << endl;
-        printstate << "MEM.wrt_enable:\t" << state.MEM.wrt_enable << endl;
+        printstate << "MEM.ALUresult:\t" << bitsetOrX(state.MEM.ALUresult, mem_valid) << endl;
+        printstate << "MEM.Store_data:\t" << bitsetOrX(state.MEM.Store_data, mem_valid) << endl;
+        printstate << "MEM.Rs:\t" << bitsetOrX(state.MEM.Rs, mem_valid) << endl;
+        printstate << "MEM.Rt:\t" << bitsetOrX(state.MEM.Rt, mem_valid) << endl;
+        printstate << "MEM.Wrt_reg_addr:\t" << bitsetOrX(state.MEM.Wrt_reg_addr, mem_valid) << endl;
+        printstate << "MEM.rd_mem:\t" << boolOrX(state.MEM.rd_mem, mem_valid) << endl;
+        printstate << "MEM.wrt_mem:\t" << boolOrX(state.MEM.wrt_mem, mem_valid) << endl;
+        printstate << "MEM.wrt_enable:\t" << boolOrX(state.MEM.wrt_enable, mem_valid) << endl;
         printstate << "MEM.nop:\t" << state.MEM.nop << endl;
 
 
-        printstate << "WB.Wrt_data:\t" << state.WB.Wrt_data << endl;
-        printstate << "WB.Rs:\t" << state.WB.Rs << endl;
-        printstate << "WB.Rt:\t" << state.WB.Rt << endl;
-        printstate << "WB.Wrt_reg_addr:\t" << state.WB.Wrt_reg_addr << endl;
-        printstate << "WB.wrt_enable:\t" << state.WB.wrt_enable << endl;
+        printstate << "WB.Wrt_data:\t" << bitsetOrX(state.WB.Wrt_data, wb_valid) << endl;
+        printstate << "WB.Rs:\t" << bitsetOrX(state.WB.Rs, wb_valid) << endl;
+        printstate << "WB.Rt:\t" << bitsetOrX(state.WB.Rt, wb_valid) << endl;
+        printstate << "WB.Wrt_reg_addr:\t" << bitsetOrX(state.WB.Wrt_reg_addr, wb_valid) << endl;
+        printstate << "WB.wrt_enable:\t" << boolOrX(state.WB.wrt_enable, wb_valid) << endl;
         printstate << "WB.nop:\t" << state.WB.nop << endl;
     }
     else cout << "Unable to open file";
