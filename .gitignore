@@ -1,0 +1,9 @@
+.DS_Store
+MIPS_pipeline
+*.o
+*.dSYM/
+*.dSYM
+RFresult.txt
+dmemresult.txt
+stateresult.txt
+code_snapshot.txt
