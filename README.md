@@ -1,4 +1,5 @@
 # MIPS Pipelined Simulator
+Built for an NYU computer architecture course (Fall 2023); repo refreshed Jan 2026 with CLI + test harness + docs.
 
 Cycle-accurate 5-stage pipelined MIPS simulator with basic hazard handling. It reads instruction/data memories from text files, simulates the pipeline, and writes register/memory/state traces to output files.
 
